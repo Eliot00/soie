@@ -5,7 +5,7 @@ from typing import Any, Awaitable, Callable, Dict, Mapping, Optional, Type, Type
 
 from typing_extensions import TypeAlias
 
-from .responses import Response
+from .responses import PlainTextResponse, Response
 from .types import Receive, Scope, Send
 
 
@@ -32,7 +32,7 @@ ErrorHandlers: TypeAlias = Dict[Type[Error], Callable[[Error], Awaitable[Respons
 
 
 async def http_error_to_response(e: HTTPException) -> Response:
-    return Response(content=e.content, status_code=e.status_code, headers=e.headers)
+    return PlainTextResponse(content=e.content, status_code=e.status_code, headers=e.headers)
 
 
 class ExceptionContextManager:

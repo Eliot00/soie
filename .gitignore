@@ -4,6 +4,7 @@ __pycache__/
 
 .idea/
 .vscode/
+.vim/
 
 .pdm.toml
 venv/

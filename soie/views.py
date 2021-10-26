@@ -5,7 +5,7 @@ from typing import Awaitable, Callable, Collection
 from typing_extensions import Literal
 
 from .requests import Request
-from .responses import Response
+from .responses import PlainTextResponse, Response
 
 AllowMethod = Literal["GET", "POST", "PUT", "DELETE", "PATCH"]
 View = Callable[[Request], Awaitable[Response]]
@@ -24,9 +24,9 @@ def require_http_method(methods: Collection[AllowMethod]):
             if request.method in allow_methods:
                 return await func(request)
             elif request.method == "OPTIONS":
-                return Response(headers=headers)
+                return PlainTextResponse(headers=headers)
             else:
-                return Response(status_code=405, headers=headers)
+                return PlainTextResponse(status_code=405, headers=headers)
 
         return inner
 

@@ -1,7 +1,21 @@
 from __future__ import annotations
 
+import json
+from abc import ABC, abstractmethod
 from http.cookies import SimpleCookie
-from typing import AnyStr, Dict, Iterable, Iterator, Mapping, Tuple, Union
+from typing import (
+    Any,
+    AnyStr,
+    Dict,
+    Generic,
+    Iterable,
+    Iterator,
+    Mapping,
+    Optional,
+    Tuple,
+    TypeVar,
+    Union,
+)
 
 from typing_extensions import Literal
 
@@ -9,22 +23,29 @@ from soie.types import Receive, Scope, Send
 
 from . import status
 
+_C = TypeVar("_C")
 
-class Response:
+
+class Response(ABC, Generic[_C]):
+    media_type = "text/plain"
+    charset = "utf-8"
+
     def __init__(
         self,
-        content: AnyStr = b"",
+        content: _C = b"",
         status_code: int = status.HTTP_200_OK,
-        headers: Mapping[str, str] = None,
-        media_type: str = "text/plain",
-        charset: str = "utf-8",
+        headers: Optional[Mapping[str, str]] = None,
+        media_type: Optional[str] = None,
+        charset: Optional[str] = None,
     ) -> None:
         self.content = content
         self.status_code = status_code
         self.headers = MutableHeaders(headers)
         self.cookies = SimpleCookie()
-        self.media_type = media_type
-        self.charset = charset
+        if media_type is not None:
+            self.media_type = media_type
+        if charset is not None:
+            self.charset = charset
 
     def set_cookie(
         self,
@@ -58,8 +79,9 @@ class Response:
     def delete_cookie(self, key: str, path: str = "/", domain: str = None) -> None:
         self.set_cookie(key, expires=0, max_age=0, path=path, domain=domain)
 
-    async def serialize_content(self, content: AnyStr) -> bytes:
-        return content if isinstance(content, bytes) else content.encode(self.charset)
+    @abstractmethod
+    async def serialize_content(self, content: _C) -> bytes:
+        ...
 
     async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
         body = await self.serialize_content(self.content)
@@ -88,10 +110,45 @@ class Response:
         )
 
 
+class PlainTextResponse(Response[AnyStr]):
+    media_type = "text/plain"
+
+    async def serialize_content(self, content: AnyStr) -> bytes:
+        return content if isinstance(content, bytes) else content.encode(self.charset)
+
+
+class JSONResponse(Response[Any]):
+    """
+    Note: Python now does not have a elegant *jsonable* type, hence the content's type is Any.
+    """
+
+    media_type = "application/json"
+
+    def __init__(
+        self,
+        content: Any,
+        status_code: int = status.HTTP_200_OK,
+        headers: Optional[Mapping[str, str]] = None,
+        **json_kwargs: Any,
+    ) -> None:
+        self.json_kwargs = {
+            "ensure_ascii": False,
+            "allow_nan": False,
+            "indent": None,
+            "separators": (",", ":"),
+            "default": None,
+        }
+        self.json_kwargs |= json_kwargs
+        super().__init__(content, status_code, headers)
+
+    async def serialize_content(self, content: Any) -> bytes:
+        return json.dumps(content, **self.json_kwargs).encode(self.charset)
+
+
 class Headers(Mapping[str, str]):
     __slots__ = ("_dict",)
 
-    def __init__(self, headers: Union[Mapping[str, str], Iterable[Tuple[str, str]]] = None) -> None:
+    def __init__(self, headers: Optional[Union[Mapping[str, str], Iterable[Tuple[str, str]]]] = None) -> None:
         store: Dict[str, str] = {}
         if isinstance(headers, Mapping):
             items = headers.items()
