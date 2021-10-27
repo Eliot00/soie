@@ -10,3 +10,7 @@ def test_query_params():
 
     with pytest.raises(KeyError):
         query["error"]
+
+
+def test_path_params_convertor():
+    pass
