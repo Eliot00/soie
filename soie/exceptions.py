@@ -27,6 +27,10 @@ class HTTPException(SoieException):
         super().__init__(status_code, content)
 
 
+class ParamNotMatched(SoieException):
+    pass
+
+
 Error = TypeVar("Error", bound=BaseException)
 ErrorHandlers: TypeAlias = Dict[Type[Error], Callable[[Error], Awaitable[Response]]]
 

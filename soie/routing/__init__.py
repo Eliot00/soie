@@ -1,3 +1,4 @@
-from .routers import HTTPRoute, Router
+from .routers import Router
+from .routes import Route
 
-__all__ = ["Router", "HTTPRoute"]
+__all__ = ["Router", "Route"]

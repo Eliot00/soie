@@ -71,9 +71,9 @@ class Soie:
 
     async def http(self, scope: Scope, receive: Receive, send: Send) -> None:
         async with ExceptionContextManager(scope, receive, send, self.err_handlers):
-            endpoint = self.router.get_endpoint(scope["path"])
+            route = self.router.get_route(scope["path"])
             request = Request(scope, receive)
-            response = await endpoint(request)
+            response = await route.endpoint(request)
             await response(scope, receive, send)
 
     async def websocket(self, scope: Scope, receive: Receive, send: Send) -> None:

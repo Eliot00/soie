@@ -19,6 +19,9 @@ class Request:
     def __getitem__(self, key: str) -> Any:
         return self._scope[key]
 
+    def __setitem__(self, key: str, value: Any) -> None:
+        self._scope[key] = value
+
     @property
     @cache
     def method(self) -> str:

@@ -3,15 +3,15 @@ from __future__ import annotations
 import dataclasses
 import os
 import re
-from typing import Callable, Collection, Dict, Iterable, List, Optional, Pattern, cast
+from typing import Callable, Collection, Dict, Iterable, List, Optional, cast
 
-from ..exceptions import HTTPException
+from ..exceptions import HTTPException, ParamNotMatched
 from ..views import AllowMethod, View, require_http_method
-from .path import ParamConvertor, compile_path
+from .routes import ParamConvertor, Route
 
 
 class Router:
-    def __init__(self, routes: Iterable[BaseRoute] = ()) -> None:
+    def __init__(self, routes: Iterable[Route] = ()) -> None:
         self.root = RadixTreeNode("/")
         for route in routes:
             self.add_route(route)
@@ -20,54 +20,42 @@ class Router:
     def http(self) -> HTTPRouteRegister:
         return HTTPRouteRegister(self)
 
-    def add_route(self, route: BaseRoute) -> Router:
-        format_path, param_convertors = compile_path(route.path)
-        node = insert_node(self.root, format_path[1:], param_convertors)
-        if node.handler is not None:
-            raise ValueError(f"Handler are already registered for path '{format_path}'.")
-        node.handler = route.endpoint
+    def add_route(self, route: Route) -> Router:
+        compiled_path, param_convertors = route.compiled_path, route.param_convertors
+        node = insert_node(self.root, compiled_path[1:], param_convertors)
+        if node.route is not None:
+            raise ValueError(f"Handler are already registered for path '{compiled_path}'.")
+        node.route = route
         return self
 
-    def get_endpoint(self, path: str) -> View:
-        endpoint = self.search(path)
-        if endpoint is None:
+    def get_route(self, path: str) -> Route:
+        route = self.search(path)
+        if route is None:
             raise HTTPException(404)
-        return endpoint
+        return route
 
-    def search(self, path: str) -> Optional[View]:
+    def search(self, path: str) -> Optional[Route]:
         stack = [(path, self.root)]
+        params = {}
         while stack:
             path, node = stack.pop()
-            if node.re_pattern is None:
+            if node.convertor is None:
                 if not path.startswith(node.characters):
                     continue
                 length = len(node.characters)
             else:
-                match = re.match(node.re_pattern, path)
-                if match is None:
+                try:
+                    matched_var = node.convertor.match(path)
+                except ParamNotMatched:
                     continue
-                result = match.group()
-                length = len(result)
+                length = len(matched_var)
+                params[node.characters] = matched_var
             if length == len(path):
-                return node.handler
+                return Route.inject_path_params(node.route, params)
             path = path[length:]
             for child in node.children or ():
                 stack.append((path, child))
         return None
-
-
-@dataclasses.dataclass
-class BaseRoute:
-    path: str
-    endpoint: View
-
-    def __post_init__(self) -> None:
-        assert self.path.startswith("/"), "Route path must start with '/'"
-
-
-@dataclasses.dataclass
-class HTTPRoute(BaseRoute):
-    pass
 
 
 class HTTPRouteRegister:
@@ -104,7 +92,7 @@ class HTTPRouteRegister:
     def _register_with_method(self, methods: Collection[AllowMethod], path: str) -> Callable[[View], View]:
         def register(endpoint: View) -> View:
             wrapped_endpoint = require_http_method(methods)(endpoint)
-            route = HTTPRoute(path, wrapped_endpoint)
+            route = Route(path, wrapped_endpoint)
             self._router.add_route(route)
             return wrapped_endpoint
 
@@ -115,8 +103,8 @@ class HTTPRouteRegister:
 @dataclasses.dataclass
 class RadixTreeNode:
     characters: str
-    re_pattern: Optional[Pattern] = None
-    handler: Optional[View] = None
+    convertor: Optional[ParamConvertor] = None
+    route: Optional[Route] = None
     children: Optional[List[RadixTreeNode]] = None
 
 
@@ -132,17 +120,16 @@ def insert_node(node: RadixTreeNode, path: str, param_convertors: Dict[str, Para
         length = matched.end()
         param_name = path[1 : length - 1]
         convertor = param_convertors[param_name]
-        re_pattern = re.compile(convertor.regex)
-        regex_children = (child for child in node.children if child.re_pattern is not None)
-        for child in regex_children:
-            if (child.re_pattern == re_pattern) != (child.characters == param_name):
+        param_children = (child for child in node.children if child.convertor is not None)
+        for child in param_children:
+            if (child.convertor.__class__ is convertor.__class__) != (child.characters == param_name):
                 raise ValueError(
                     "The same regular matching is used in the same position, but the parameter names are different"
                 )
             if child.characters == param_name:
                 return insert_node(child, path[length:], param_convertors)
 
-        new_node = RadixTreeNode(param_name, re_pattern=re_pattern)
+        new_node = RadixTreeNode(param_name, convertor=convertor)
         node.children.insert(0, new_node)
         return insert_node(new_node, path[length:], param_convertors)
     else:
@@ -150,7 +137,7 @@ def insert_node(node: RadixTreeNode, path: str, param_convertors: Dict[str, Para
         if length == -1:
             length = len(path)
 
-        static_children = (child for child in node.children if child.re_pattern is None)
+        static_children = (child for child in node.children if child.convertor is None)
         for child in static_children:
             common_prefix = os.path.commonprefix([child.characters, path[:length]])
             if common_prefix == "":

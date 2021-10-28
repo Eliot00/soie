@@ -1,6 +1,6 @@
 from functools import wraps
 from itertools import chain
-from typing import Awaitable, Callable, Collection
+from typing import Any, Awaitable, Callable, Collection, Iterator
 
 from typing_extensions import Literal
 
@@ -11,7 +11,7 @@ AllowMethod = Literal["GET", "POST", "PUT", "DELETE", "PATCH"]
 View = Callable[[Request], Awaitable[Response]]
 
 
-def require_http_method(methods: Collection[AllowMethod]):
+def require_http_method(methods: Collection[AllowMethod]) -> Callable[[View], View]:
     if "GET" in methods:
         allow_methods = set(chain(methods, ("HEAD",)))
     else:
@@ -31,3 +31,12 @@ def require_http_method(methods: Collection[AllowMethod]):
         return inner
 
     return decorator
+
+
+def inject_path_params(params: Iterator[tuple[str, Any]], func: View) -> View:
+    @wraps(func)
+    async def inner(request: Request) -> Response:
+        request["path_params"] = params
+        return await func(request)
+
+    return inner
