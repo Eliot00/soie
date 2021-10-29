@@ -36,7 +36,7 @@ def require_http_method(methods: Collection[AllowMethod]) -> Callable[[View], Vi
 def inject_path_params(params: Iterator[tuple[str, Any]], func: View) -> View:
     @wraps(func)
     async def inner(request: Request) -> Response:
-        request["path_params"] = params
+        request.path_params = {key: value for key, value in params}
         return await func(request)
 
     return inner

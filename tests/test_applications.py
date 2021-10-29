@@ -12,7 +12,7 @@ async def test_dynamic_router_app():
     @app.router.http.get("/hi/{name}")
     async def greet(request):
         params = request["path_params"]
-        return JSONResponse({key: value for key, value in params})
+        return JSONResponse(params)
 
     async with TestClient(app) as client:
         res = await client.get("/hi/Jack")

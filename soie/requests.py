@@ -19,13 +19,18 @@ class Request:
     def __getitem__(self, key: str) -> Any:
         return self._scope[key]
 
-    def __setitem__(self, key: str, value: Any) -> None:
-        self._scope[key] = value
-
     @property
     @cache
     def method(self) -> str:
         return self._scope["method"]
+
+    @property
+    def path_params(self) -> dict[str, Any]:
+        return self._scope.get("path_params", {})
+
+    @path_params.setter
+    def path_params(self, params):
+        self._scope["path_params"] = params
 
     @property
     @cache
