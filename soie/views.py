@@ -40,3 +40,7 @@ def inject_path_params(params: Iterator[tuple[str, Any]], func: View) -> View:
         return await func(request)
 
     return inner
+
+
+class ClassView:
+    pass

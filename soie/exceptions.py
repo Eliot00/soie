@@ -1,11 +1,11 @@
 from __future__ import annotations
 
 from http import HTTPStatus
-from typing import Any, Awaitable, Callable, Dict, Mapping, Optional, Type, TypeVar
+from typing import Awaitable, Callable, Dict, Mapping, Optional, Type, TypeVar
 
 from typing_extensions import TypeAlias
 
-from .responses import PlainTextResponse, Response
+from .responses import JSONResponse, Response
 from .types import Receive, Scope, Send
 
 
@@ -17,7 +17,10 @@ class SoieException(Exception):
 
 class HTTPException(SoieException):
     def __init__(
-        self, status_code: int = 400, headers: Optional[Mapping[str, str]] = None, content: Any = None
+        self,
+        status_code: int = 400,
+        headers: Optional[Mapping[str, str]] = None,
+        content: Optional[str | dict[str, str]] = None,
     ) -> None:
         self.status_code = status_code
         self.headers = headers
@@ -26,31 +29,31 @@ class HTTPException(SoieException):
         self.content = content
         super().__init__(status_code, content)
 
+    async def to_response(self) -> JSONResponse:
+        return JSONResponse(self.content, status_code=self.status_code, headers=self.headers)
+
 
 class ParamNotMatched(SoieException):
     pass
 
 
-Error = TypeVar("Error", bound=BaseException)
-ErrorHandlers: TypeAlias = Dict[Type[Error], Callable[[Error], Awaitable[Response]]]
-
-
-async def http_error_to_response(e: HTTPException) -> Response:
-    return PlainTextResponse(content=e.content, status_code=e.status_code, headers=e.headers)
+E = TypeVar("E", bound=BaseException)
+ExceptionHandler = Callable[[E], Awaitable[Response]]
+ExceptionHandlers: TypeAlias = Dict[Type[E], ExceptionHandler]
 
 
 class ExceptionContextManager:
     def __init__(
         self,
+        exception_handlers: ExceptionHandlers,
         scope: Scope,
         receive: Receive,
         send: Send,
-        err_handlers: ErrorHandlers = None,
     ):
-        self.err_handlers = {HTTPException: http_error_to_response}
-        if err_handlers is not None:
-            self.err_handlers |= err_handlers
-        self._asgi_context = (scope, receive, send)
+        self.exception_handlers = exception_handlers
+        self._scope = scope
+        self._receive = receive
+        self._send = send
 
     async def __aenter__(self) -> ExceptionContextManager:
         return self
@@ -58,9 +61,9 @@ class ExceptionContextManager:
     async def __aexit__(self, exc_type, exc_val, exc_tb) -> bool:
         if exc_type is None:
             return True
-        convertor = self.err_handlers.get(exc_type)
+        convertor = self.exception_handlers.get(exc_type)
         if convertor is None:
             return False
         response = await convertor(exc_val)
-        await response(*self._asgi_context)
+        await response(self._scope, self._receive, self._send)
         return True
