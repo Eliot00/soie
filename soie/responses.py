@@ -124,25 +124,10 @@ class JSONResponse(Response[Any]):
 
     media_type = "application/json"
 
-    def __init__(
-        self,
-        content: Any,
-        status_code: int = status.HTTP_200_OK,
-        headers: Optional[Mapping[str, str]] = None,
-        **json_kwargs: Any,
-    ) -> None:
-        self.json_kwargs = {
-            "ensure_ascii": False,
-            "allow_nan": False,
-            "indent": None,
-            "separators": (",", ":"),
-            "default": None,
-        }
-        self.json_kwargs |= json_kwargs
-        super().__init__(content, status_code, headers)
-
     async def serialize_content(self, content: Any) -> bytes:
-        return json.dumps(content, **self.json_kwargs).encode(self.charset)
+        return json.dumps(
+            content, ensure_ascii=False, allow_nan=False, indent=None, separators=(",", ":"), default=None
+        ).encode(self.charset)
 
 
 class Headers(Mapping[str, str]):

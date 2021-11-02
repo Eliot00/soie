@@ -5,7 +5,7 @@ from typing import Any, Awaitable, Callable, Collection, Iterator
 from typing_extensions import Literal
 
 from .requests import Request
-from .responses import PlainTextResponse, Response
+from .responses import JSONResponse, PlainTextResponse, Response
 
 AllowMethod = Literal["GET", "POST", "PUT", "DELETE", "PATCH"]
 View = Callable[[Request], Awaitable[Response]]
@@ -42,5 +42,10 @@ def inject_path_params(params: Iterator[tuple[str, Any]], func: View) -> View:
     return inner
 
 
-class ClassView:
-    pass
+def auto_json_response(func: Callable[[Request], Awaitable[Any]]) -> View:
+    @wraps(func)
+    async def inner(request: Request) -> JSONResponse:
+        raw_value = await func(request)
+        return JSONResponse(raw_value)
+
+    return inner
