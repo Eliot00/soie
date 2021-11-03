@@ -1,6 +1,6 @@
 from functools import wraps
 from itertools import chain
-from typing import Any, Awaitable, Callable, Collection, Iterator
+from typing import Any, Awaitable, Callable, Collection
 
 from typing_extensions import Literal
 
@@ -31,15 +31,6 @@ def require_http_method(methods: Collection[AllowMethod]) -> Callable[[View], Vi
         return inner
 
     return decorator
-
-
-def inject_path_params(params: Iterator[tuple[str, Any]], func: View) -> View:
-    @wraps(func)
-    async def inner(request: Request) -> Response:
-        request.path_params = {key: value for key, value in params}
-        return await func(request)
-
-    return inner
 
 
 def auto_json_response(func: Callable[[Request], Awaitable[Any]]) -> View:

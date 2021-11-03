@@ -1,10 +1,10 @@
 from __future__ import annotations
 
 import re
-from typing import Any, Dict, Iterator, Mapping, Protocol, Tuple
+from typing import Any, Dict, Protocol, Tuple
 
 from ..exceptions import ParamNotMatched
-from ..views import View, inject_path_params
+from ..views import View
 
 
 class Route:
@@ -14,18 +14,6 @@ class Route:
         self.path = path
         self.endpoint = endpoint
         self.compiled_path, self.param_convertors = compile_path(path)
-
-    def convert_matched_params(self, params: Mapping[str, str]) -> Iterator[tuple[str, Any]]:
-        for name, value in params.items():
-            yield name, self.param_convertors[name].to_python(value)
-
-    @staticmethod
-    def inject_path_params(route: Route | None, params: Mapping[str, str]) -> Route | None:
-        if route is None or len(params) == 0:
-            return route
-        converted_params = route.convert_matched_params(params)
-        route.endpoint = inject_path_params(converted_params, route.endpoint)
-        return route
 
 
 class ParamConvertor(Protocol):

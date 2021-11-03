@@ -2,21 +2,7 @@ import pytest
 from async_asgi_testclient import TestClient
 
 from soie.applications import Soie
-from soie.responses import JSONResponse, PlainTextResponse
-
-
-@pytest.mark.asyncio
-async def test_dynamic_router_app():
-    app = Soie()
-
-    @app.router.http.get("/hi/{name}")
-    async def greet(request):
-        params = request["path_params"]
-        return JSONResponse(params)
-
-    async with TestClient(app) as client:
-        res = await client.get("/hi/Jack")
-        assert res.json() == {"name": "Jack"}
+from soie.responses import PlainTextResponse
 
 
 @pytest.mark.asyncio
@@ -31,7 +17,7 @@ async def test_add_exception_handler():
     async def key_error_handler(request, exc):
         return PlainTextResponse(request.query_params["key"], 422)
 
-    @app.router.http.get("/value_error")
+    @app.router.http.get("/value_error")  # type: ignore
     async def value_error(request):
         raise ValueError("value error")
 
@@ -40,7 +26,7 @@ async def test_add_exception_handler():
         request.query_params["error_key"]
         return PlainTextResponse()
 
-    @app.router.http.get("/no_catch")
+    @app.router.http.get("/no_catch")  # type: ignore
     async def no_catch(request):
         raise AttributeError("attribute error")
 

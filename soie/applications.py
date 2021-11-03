@@ -39,7 +39,7 @@ class Soie:
 
     async def http(self, scope: Scope, receive: Receive, send: Send) -> None:
         async with ASGIContextManager(scope, receive, send, self._exception_handlers) as request:
-            route = self.router.get_route(scope["path"])
+            route = self.router.get_route(request)
             response = await route.endpoint(request)
             await response(scope, receive, send)
 

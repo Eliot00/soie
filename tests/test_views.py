@@ -1,32 +1,7 @@
 import pytest
 
-from soie.responses import JSONResponse, PlainTextResponse
-from soie.views import auto_json_response, inject_path_params
-
-
-def test_inject_wrap():
-    params = (("number", i) for i in range(5))
-
-    async def one(_):
-        return PlainTextResponse()
-
-    async def two(_):
-        return PlainTextResponse()
-
-    async def three(_):
-        return PlainTextResponse()
-
-    async def four(_):
-        return PlainTextResponse()
-
-    async def five(_):
-        return PlainTextResponse()
-
-    assert inject_path_params(params, one).__name__ == "one"
-    assert inject_path_params(params, two).__name__ == "two"
-    assert inject_path_params(params, three).__name__ == "three"
-    assert inject_path_params(params, four).__name__ == "four"
-    assert inject_path_params(params, five).__name__ == "five"
+from soie.responses import JSONResponse
+from soie.views import auto_json_response
 
 
 @pytest.mark.asyncio

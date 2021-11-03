@@ -6,6 +6,7 @@ import re
 from typing import Callable, Collection, Dict, Iterable, List, Optional, cast
 
 from ..exceptions import HTTPException, ParamNotMatched
+from ..requests import Request
 from ..views import AllowMethod, View, require_http_method
 from .routes import ParamConvertor, Route
 
@@ -28,13 +29,14 @@ class Router:
         node.route = route
         return self
 
-    def get_route(self, path: str) -> Route:
-        route = self.search(path)
+    def get_route(self, request: Request) -> Route:
+        route = self.search(request)
         if route is None:
             raise HTTPException(404)
         return route
 
-    def search(self, path: str) -> Optional[Route]:
+    def search(self, request: Request) -> Optional[Route]:
+        path = request["path"]
         stack = [(path, self.root)]
         params = {}
         while stack:
@@ -49,9 +51,10 @@ class Router:
                 except ParamNotMatched:
                     continue
                 length = len(matched_var)
-                params[node.characters] = matched_var
+                params[node.characters] = node.convertor.to_python(matched_var)
             if length == len(path):
-                return Route.inject_path_params(node.route, params)
+                request.path_params = params
+                return node.route
             path = path[length:]
             for child in node.children or ():
                 stack.append((path, child))
